@@ -1,5 +1,16 @@
-from textnode import TextNode, TextType
+from textnode import TextNode, TextType, text_node_to_html_node
+from htmlnode import ParentNode, LeafNode
+from enum import Enum
 import re
+
+
+class BlockType(Enum):
+    PARAGRAPH = "paragraph"
+    HEADING = "heading"
+    CODE = "code"
+    QUOTE = "quote"
+    UNORDERED_LIST = "unordered_list"
+    ORDERED_LIST = "ordered_list"
 
 def text_to_textnodes(text):
     nodes = [TextNode(text, TextType.TEXT)]
@@ -97,10 +108,96 @@ def extract_markdown_links(text):
 
 def markdown_to_blocks(markdown):
     blocks = markdown.split("\n\n")
-    filtered_blocks = []
+    return [block.strip() for block in blocks if block.strip() != ""]
+
+
+def block_to_block_type(block):
+    lines = block.split("\n")
+
+    # Heading: starts with 1–6 '#' followed by a space
+    if block.startswith(("# ", "## ", "### ", "#### ", "##### ", "###### ")):
+        return BlockType.HEADING
+
+    # Code block: starts and ends with ``` (allowing leading spaces)
+    if len(lines) > 1 and lines[0].lstrip().startswith("```") and lines[-1].lstrip().startswith("```"):
+        return BlockType.CODE
+
+    # Quote block: every line must start with '>'
+    if block.startswith(">"):
+        for line in lines:
+            if not line.startswith(">"):
+                return BlockType.PARAGRAPH
+        return BlockType.QUOTE
+
+    # Unordered list: every line starts with '- '
+    if block.startswith("- "):
+        for line in lines:
+            if not line.startswith("- "):
+                return BlockType.PARAGRAPH
+        return BlockType.UNORDERED_LIST
+
+    # Ordered list: every line starts with '1. ', '2. ', etc.
+    if block.startswith("1. "):
+        i = 1
+        for line in lines:
+            if not line.startswith(f"{i}. "):
+                return BlockType.PARAGRAPH
+            i += 1
+        return BlockType.ORDERED_LIST
+
+    # Default: paragraph
+    return BlockType.PARAGRAPH
+
+
+
+def markdown_to_html_node(markdown: str) -> ParentNode:
+    blocks = markdown_to_blocks(markdown)
+    children = []
+
     for block in blocks:
-        if block == "":
-            continue
-        block = block.strip()
-        filtered_blocks.append(block)
-    return filtered_blocks
+        block_type = block_to_block_type(block)
+
+        if block_type == BlockType.HEADING:
+            level = len(block.split(" ")[0])
+            content = block[level + 1:].strip()
+            text_nodes = text_to_textnodes(content)
+            html_children = [text_node_to_html_node(tn) for tn in text_nodes]
+            children.append(ParentNode(f"h{level}", html_children))
+
+        elif block_type == BlockType.PARAGRAPH:
+            flat_block = re.sub(r"\s+", " ", block.strip())
+            text_nodes = text_to_textnodes(flat_block)
+            html_children = [text_node_to_html_node(tn) for tn in text_nodes]
+            children.append(ParentNode("p", html_children))
+
+        elif block_type == BlockType.QUOTE:
+            quote_text = "\n".join([line[1:].lstrip() for line in block.splitlines()])
+            text_nodes = text_to_textnodes(quote_text)
+            html_children = [text_node_to_html_node(tn) for tn in text_nodes]
+            children.append(ParentNode("blockquote", html_children))
+
+        elif block_type == BlockType.UNORDERED_LIST:
+            list_items = []
+            for line in block.splitlines():
+                content = line[2:]
+                text_nodes = text_to_textnodes(content)
+                html_children = [text_node_to_html_node(tn) for tn in text_nodes]
+                list_items.append(ParentNode("li", html_children))
+            children.append(ParentNode("ul", list_items))
+
+        elif block_type == BlockType.ORDERED_LIST:
+            list_items = []
+            for line in block.splitlines():
+                content = line[line.find(". ") + 2:]
+                text_nodes = text_to_textnodes(content)
+                html_children = [text_node_to_html_node(tn) for tn in text_nodes]
+                list_items.append(ParentNode("li", html_children))
+            children.append(ParentNode("ol", list_items))
+
+        elif block_type == BlockType.CODE:
+            code_lines = [line.strip() for line in block.splitlines()[1:-1]]
+            code_text = "\n".join(code_lines) + "\n"
+            code_node = text_node_to_html_node(TextNode(code_text, TextType.TEXT))
+            children.append(ParentNode("pre", [ParentNode("code", [code_node])]))
+
+    return ParentNode("div", children)
