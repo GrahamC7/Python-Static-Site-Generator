@@ -1,5 +1,6 @@
 import os
-from inline_markdown import markdown_to_html_node
+from markdown_blocks import markdown_to_html_node
+
 
 def generate_page(from_path, template_path, dest_path):
     print(f" * {from_path} {template_path} -> {dest_path}")
@@ -15,7 +16,7 @@ def generate_page(from_path, template_path, dest_path):
     html = node.to_html()
 
     title = extract_title(markdown_content)
-    template = template.replace("{{ Title  }}", title)
+    template = template.replace("{{ Title }}", title)
     template = template.replace("{{ Content }}", html)
 
     dest_dir_path = os.path.dirname(dest_path)
@@ -24,9 +25,10 @@ def generate_page(from_path, template_path, dest_path):
     to_file = open(dest_path, "w")
     to_file.write(template)
 
+
 def extract_title(md):
     lines = md.split("\n")
     for line in lines:
         if line.startswith("# "):
             return line[2:]
-    raise ValueError("No title found")
+    raise ValueError("no title found")
