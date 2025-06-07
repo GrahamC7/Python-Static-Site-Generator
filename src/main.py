@@ -19,6 +19,8 @@ def copy_static(source_dir, dest_dir):
             print("Created directory:, {dest_path}")
             copy_static(source_path, dest_path)
 
+    
+
 def main():
     print("Copying static files...")
     copy_static("static", "public")
