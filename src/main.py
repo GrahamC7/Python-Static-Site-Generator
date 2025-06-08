@@ -28,7 +28,7 @@ def main():
     copy_files_recursive(dir_path_static, dir_path_public)
 
     print("Generating pages from content...")
-    generate_pages_recursive(dir_path_content, template_path, dir_path_public)
+    generate_pages_recursive(dir_path_content, template_path, dir_path_public, base_path)
 
     print("Done.")
 
